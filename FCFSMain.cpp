@@ -15,6 +15,7 @@ public:
 	int responseTime;
 	int waitTime;
 	int turnAroundTime;
+	process *previous;
 	process *next;
 };
 
@@ -31,12 +32,15 @@ public:
 	void printReadyQueue();
 	void printIOQueue();
 	void deQueue();
+	void deQueueSpecific(process transfer);
 	void adjustQueue(int IO);
 	void readyQueuePrint();
 	void IOQueuePrint();
 	bool isEmpty();
 	void reduce();
 	bool transfer();
+	process getFinishIO();
+	int getBurst();
 	
 private:
 	process *front;
@@ -76,6 +80,7 @@ void Algorithm::readyQueue(process readyQueue[],int elements) {
 		else {
 			created = new process;
 			back->next = created;
+			created->previous = back;
 			back = created;
 			created->name = readyQueue[i].name;
 			for (int j = 0; readyQueue[i].CPUBurstAndIO[j]!=0; j++) {
@@ -95,6 +100,7 @@ void Algorithm::readyQueue(process readyQueue[],int elements) {
 void Algorithm::deQueue() {
 	process *temp = front;
 	front = front->next;
+	front->previous = 0;
 	delete temp;
 }
 
@@ -143,6 +149,7 @@ process Algorithm::sendToIO(process current) {
 	else {
 		created = new process;
 		back->next = created;
+		created->previous = back;
 		back = created;
 		created->name = current.name;
 		for (int j = 0; current.CPUBurstAndIO[j] != 0; j++) {
@@ -162,6 +169,7 @@ void Algorithm::adjustQueue(int IO) {
 	process *point = back;
 	point->currentState = "IO";
 	point->currentIO = IO;
+	point->currentCPUBurst = point->currentCPUBurst + 2;
 }
 
 void Algorithm::print(process current, int time) {
@@ -193,7 +201,7 @@ void Algorithm::readyQueuePrint() {
 	}
 	else {
 		for (i = front; i != back->next; i = i->next) {
-			cout << "               " << i->name << "      " << i->CPUBurstAndIO[p] << endl;
+			cout << "               " << i->name << "      " << i->CPUBurstAndIO[i->currentCPUBurst] << endl;
 		}
 	}
 }
@@ -219,7 +227,7 @@ void Algorithm::reduce() {
 		front->currentIO--;
 	}
 	else {
-		for (process *p = front; p->next != 0; p = p->next) {
+		for (process *p = front; p != 0; p = p->next) {
 			p->currentIO--;
 		}
 	}
@@ -236,11 +244,70 @@ bool Algorithm::isEmpty() {
 
 bool Algorithm::transfer() {
 	 process *p = front;
-	if (front!=0 && p->currentIO == 0) {
-		return true;
+	if (isEmpty()==false) {
+		for (p = front; p != 0; p = p->next) {
+			if (p->currentIO == 0) {
+				return true;
+			}
+		}
+		return false;
 	}
 	return false;
 }
+
+process Algorithm::getFinishIO() {
+	for (process *p = front; p != 0; p = p->next) {
+		if (p->currentIO == 0) {
+			return *p;
+		}
+	}
+}
+
+int Algorithm::getBurst() {
+	int p = 0;
+	return p;
+}
+
+void Algorithm::deQueueSpecific(process transfer) {
+	process *p = front;
+	if (front == 0) {
+		return;
+	}
+	else if (front->next == 0) {
+		delete front;
+	}
+	else {
+		for (p = front; p != 0; p = p->next) {
+			if (p==front && p->name == transfer.name) {
+				process *q = p->next;
+				q->previous = 0;
+				front = q;
+				delete p;
+				p = q;
+			}
+			else if (p==back && p->name == transfer.name) {
+				process *q = p->previous;
+				q->next = 0;
+				back = q;
+				delete p;
+				p = q;
+			}
+			else {
+				process *q = p->previous;
+				q->next = p->next;
+				q->next->previous = q;
+				delete p;
+				p = q;
+			}
+		}
+	}
+	//p->name == transfer.name
+
+	/*process *temp = front;
+	front = front->next;
+	delete temp;*/
+}
+
 
 int main() {//Ready Queue is a linked list
 
@@ -276,22 +343,19 @@ int main() {//Ready Queue is a linked list
 				ReadyQueue.print(now, time);
 				ReadyQueue.printReadyQueue();
 				IOQueue.printIOQueue();
-				//IOQueue.sendToIO(now);
-				//IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j+1]);
 				now = ReadyQueue.current();
 				time++;
 			}
 			else {
 				if (time == endTime) {
 					IOQueue.sendToIO(previous);
+					j = IOQueue.last().currentCPUBurst;
 					IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j + 1]);
 					now = ReadyQueue.current();
 					ReadyQueue.print(now, time);
 					previous = ReadyQueue.current();
 					ReadyQueue.deQueue();
 					ReadyQueue.printReadyQueue();
-					//IOQueue.sendToIO(now);
-					//IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j + 1]);
 					IOQueue.printIOQueue();
 					endTime = time + now.CPUBurstAndIO[j];
 					i = now.CPUBurstAndIO[j];
@@ -299,8 +363,8 @@ int main() {//Ready Queue is a linked list
 				time++;
 				IOQueue.reduce();
 				if (IOQueue.transfer() == true) {
-					transfer = IOQueue.current();
-					IOQueue.deQueue();
+					transfer = IOQueue.getFinishIO();
+					IOQueue.deQueueSpecific(transfer);
 					ReadyQueue.sendToIO(transfer);//same as sendToReadyQueue
 				}
 			}
