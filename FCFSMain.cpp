@@ -41,6 +41,8 @@ public:
 	bool transfer();
 	process getFinishIO();
 	int getBurst();
+	friend bool isCompleted(process transfer);
+	bool hasOne();
 	
 private:
 	process *front;
@@ -98,13 +100,27 @@ void Algorithm::readyQueue(process readyQueue[],int elements) {
 }
 
 void Algorithm::deQueue() {
-	process *temp = front;
-	front = front->next;
-	front->previous = 0;
-	delete temp;
+	if (front == 0) {
+		return;
+	}
+	else if (front->next == 0) {
+		delete front;
+		front = 0;
+		back = 0;
+	}
+	else {
+		process *temp = front;
+		front = front->next;
+		front->previous = 0;
+		delete temp;
+	}
 }
 
 process Algorithm::current() {
+	process IDLE{ "IDLE"};
+	if (front == 0) {
+		return IDLE;
+	}
 	process *p = front;
 	return *p;
 }
@@ -274,7 +290,8 @@ void Algorithm::deQueueSpecific(process transfer) {
 		return;
 	}
 	else if (front->next == 0) {
-		delete front;
+		delete p;
+		front = 0;
 	}
 	else {
 		for (p = front; p != 0; p = p->next) {
@@ -284,6 +301,7 @@ void Algorithm::deQueueSpecific(process transfer) {
 				front = q;
 				delete p;
 				p = q;
+				break;
 			}
 			else if (p==back && p->name == transfer.name) {
 				process *q = p->previous;
@@ -291,13 +309,15 @@ void Algorithm::deQueueSpecific(process transfer) {
 				back = q;
 				delete p;
 				p = q;
+				break;
 			}
-			else {
+			else if(p->name==transfer.name){//problem here
 				process *q = p->previous;
 				q->next = p->next;
 				q->next->previous = q;
 				delete p;
 				p = q;
+				break;
 			}
 		}
 	}
@@ -306,6 +326,20 @@ void Algorithm::deQueueSpecific(process transfer) {
 	/*process *temp = front;
 	front = front->next;
 	delete temp;*/
+}
+
+bool isCompleted(process transfer) {
+	if (transfer.CPUBurstAndIO[transfer.currentCPUBurst + 1] == 0) {
+		return true;
+	}
+	return false;
+}
+
+bool Algorithm::hasOne() {
+	if (front != 0 && front->next == 0) {
+		return true;
+	}
+	return false;
 }
 
 
@@ -348,24 +382,34 @@ int main() {//Ready Queue is a linked list
 			}
 			else {
 				if (time == endTime) {
-					IOQueue.sendToIO(previous);
-					j = IOQueue.last().currentCPUBurst;
-					IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j + 1]);
-					now = ReadyQueue.current();
+					if (isCompleted(previous) == false) {
+						IOQueue.sendToIO(previous);
+						j = IOQueue.last().currentCPUBurst;
+						IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j + 1]);
+					}
+					now = ReadyQueue.current();//returns null
 					ReadyQueue.print(now, time);
 					previous = ReadyQueue.current();
 					ReadyQueue.deQueue();
 					ReadyQueue.printReadyQueue();
 					IOQueue.printIOQueue();
-					endTime = time + now.CPUBurstAndIO[j];
+					endTime = time + now.CPUBurstAndIO[now.currentCPUBurst];
 					i = now.CPUBurstAndIO[j];
 				}
 				time++;
 				IOQueue.reduce();
-				if (IOQueue.transfer() == true) {
-					transfer = IOQueue.getFinishIO();
-					IOQueue.deQueueSpecific(transfer);
-					ReadyQueue.sendToIO(transfer);//same as sendToReadyQueue
+				for (;;) {
+					if (IOQueue.transfer() == true) {
+						transfer = IOQueue.getFinishIO();
+						IOQueue.deQueueSpecific(transfer);
+						ReadyQueue.sendToIO(transfer);//same as sendToReadyQueue
+						if (ReadyQueue.hasOne()) {
+							endTime = time + transfer.CPUBurstAndIO[transfer.currentCPUBurst];
+						}
+					}
+					else {
+						break;
+					}
 				}
 			}
 		}
