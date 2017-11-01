@@ -394,7 +394,7 @@ int main() {//Ready Queue is a linked list
 					ReadyQueue.printReadyQueue();
 					IOQueue.printIOQueue();
 					endTime = time + now.CPUBurstAndIO[now.currentCPUBurst];
-					i = now.CPUBurstAndIO[j];
+					i = now.CPUBurstAndIO[now.currentCPUBurst];
 				}
 				time++;
 				IOQueue.reduce();
@@ -403,8 +403,13 @@ int main() {//Ready Queue is a linked list
 						transfer = IOQueue.getFinishIO();
 						IOQueue.deQueueSpecific(transfer);
 						ReadyQueue.sendToIO(transfer);//same as sendToReadyQueue
-						if (ReadyQueue.hasOne()) {
-							endTime = time + transfer.CPUBurstAndIO[transfer.currentCPUBurst];
+						if (ReadyQueue.hasOne()&& i==0) {
+							if (now.name == "IDLE") {
+								endTime = time;
+							}
+							else {
+								endTime = time + transfer.CPUBurstAndIO[transfer.currentCPUBurst];
+							}	
 						}
 					}
 					else {
@@ -414,5 +419,6 @@ int main() {//Ready Queue is a linked list
 			}
 		}
 	}
+	cout << "DONE!" << endl << endl;
 	return 0;
 }
