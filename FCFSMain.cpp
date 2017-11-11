@@ -23,9 +23,8 @@ class Algorithm
 {
 public:
 	Algorithm();
-	void readyQueue(process initial[], int elements);
-	process sendToIO(process current);
-	process run(process current, int time);
+	void initializeQueue(process initial[], int elements);
+	process sendToQueue(process current);
 	process current();
 	process last();
 	void print(process current, int time);
@@ -41,9 +40,13 @@ public:
 	bool transfer();
 	process getFinishIO();
 	int getBurst();
-	friend bool isCompleted(process transfer);
+	bool isCompleted(process transfer, int time);
 	bool hasOne();
-	
+	void printFinished();
+	void computeWaitTime(process initial[]);
+	void setResponseTime(int time, process now);
+	bool isFinished(process previous, int time);
+
 private:
 	process *front;
 	process *back;
@@ -54,9 +57,7 @@ Algorithm::Algorithm() {
 	back = 0;
 }
 
-void Algorithm::readyQueue(process readyQueue[],int elements) {
-	/*process next = readyQueue[0];
-	return next;*/
+void Algorithm::initializeQueue(process readyQueue[],int elements) {
 	int i=0;
 	int array[] = { 1,2,3,4,5,6,7,8 };
 	int num2 = sizeof(array) / sizeof(*array);
@@ -130,23 +131,7 @@ process Algorithm::last() {
 	return *p;
 }
 
-process Algorithm::run(process current, int time) {
-	process *ran = front;
-	process IO = sendToIO(*ran);
-	int CPUBurst = current.CPUBurstAndIO[0];
-	for (int i = current.CPUBurstAndIO[0]; i >= 0; i--) {
-		if (time == 0) {
-			break;
-		}
-		else {
-			time++;
-		}
-	}
-	print(current, time);
-	return *ran;
-}
-
-process Algorithm::sendToIO(process current) {
+process Algorithm::sendToQueue(process current) {
 	process *created;
 	if (front == 0) {
 		created = new process;
@@ -311,7 +296,7 @@ void Algorithm::deQueueSpecific(process transfer) {
 				p = q;
 				break;
 			}
-			else if(p->name==transfer.name){//problem here
+			else if(p->name==transfer.name){
 				process *q = p->previous;
 				q->next = p->next;
 				q->next->previous = q;
@@ -321,15 +306,18 @@ void Algorithm::deQueueSpecific(process transfer) {
 			}
 		}
 	}
-	//p->name == transfer.name
-
-	/*process *temp = front;
-	front = front->next;
-	delete temp;*/
 }
 
-bool isCompleted(process transfer) {
-	if (transfer.CPUBurstAndIO[transfer.currentCPUBurst + 1] == 0) {
+bool Algorithm::isCompleted(process transfer, int time) {
+	process *p = front;
+	if (transfer.name == "IDLE") {
+		return true;
+	}
+	else if (transfer.CPUBurstAndIO[transfer.currentCPUBurst + 1] == 0) {
+		while (p->name != transfer.name) {
+			p = p->next;
+		}
+		p->turnAroundTime = time;
 		return true;
 	}
 	return false;
@@ -342,25 +330,77 @@ bool Algorithm::hasOne() {
 	return false;
 }
 
+void Algorithm::printFinished() {
+	cout << "*******************************************************************" << endl;
+	cout << "Process Response Time Turnaround Time Wait Time" << endl;
+	for (process *p = front; p != 0; p = p->next) {
+		cout << p->name << "         " << p->responseTime << "          " << p->turnAroundTime << "          " << p->waitTime << endl;
+	}
+}
 
-int main() {//Ready Queue is a linked list
+void Algorithm::computeWaitTime(process initial[]) {
+	int totalBurstAndIO = 0;
+	int burstOrIO = 0;
+	for (process *i = front; i != back->next; i = i->next) {
+		totalBurstAndIO = 0;
+		for (int j = 0; i->CPUBurstAndIO[j] != 0; j++) {
+			burstOrIO = i->CPUBurstAndIO[j];
+			totalBurstAndIO = totalBurstAndIO + burstOrIO;
+		}
+		i->waitTime = i->turnAroundTime - totalBurstAndIO;
+	}
+}
 
+void Algorithm::setResponseTime(int time, process now) {
+	process *p = front->next;
+	while (p != 0 && p->name != now.name) {
+		p = p->next;
+	}
+	if (p == 0) {
+		return;
+	}
+	if (p->responseTime == 0) {
+		p->responseTime = time;
+	}
+	else {
+		return;
+	}
+}
+
+bool Algorithm::isFinished(process previous, int time) {
+	process *p = front;
+	if (previous.CPUBurstAndIO[(previous.currentCPUBurst) + 1] == 0) {
+		while (p->name != previous.name) {
+			p = p->next;
+		}
+		p->turnAroundTime = time;
+		return true;
+	}
+	return false;
+}
+
+
+int main() {
+
+	Algorithm Queue;
 	Algorithm ReadyQueue;
 	Algorithm IOQueue;
+	Algorithm Finished;
 	process IO;
 	int time = 0;
-	process p1{ "P1",{ 4, 15, 5, 31, 6, 26, 7, 24, 6, 41, 4, 51, 5, 16, 4 }, 0, 0, "Waiting" };
-	process p2{ "P2",{ 9, 28, 11, 22, 15, 21, 12, 28, 8, 34, 11, 34, 9, 29, 10, 31, 7 }, 0, 0, "Waiting" };
-	process p3{ "P3",{ 24, 28, 12, 21, 6, 27, 17, 21, 11, 54, 22, 31, 18 }, 0, 0, "Waiting" };
-	process	p4{ "P4",{ 15, 35, 14, 41, 16, 45, 18, 51, 14, 61, 13, 54, 16, 61, 15 }, 0, 0, "Waiting" };
-	process p5{ "P5",{ 6, 22, 5, 21, 15, 31, 4, 26, 7, 31, 4, 18, 6, 21, 10, 33, 3 }, 0, 0, "Waiting" };
-	process p6{ "P6",{ 22, 38, 27, 41, 25, 29, 11, 26, 19, 32, 18, 22, 6, 26, 6 }, 0, 0, "Waiting" };
-	process p7{ "P7",{ 4, 36, 7, 31, 6, 32, 5, 41, 4, 42, 7, 39, 6, 33, 5, 34, 6, 21, 9 }, 0, 0, "Waiting" };
-	process p8{ "P8",{ 5, 14, 4, 33, 6, 31, 4, 31, 6, 27, 5, 21, 4, 19, 6, 11, 6 }, 0, 0, "Waiting" };
+	process p1{ "P1",{ 4, 15, 5, 31, 6, 26, 7, 24, 6, 41, 4, 51, 5, 16, 4}, 0, 0, "Waiting" };
+	process p2{ "P2",{ 9, 28, 11, 22, 15, 21, 12, 28, 8, 34, 11, 34, 9, 29, 10, 31, 7}, 0, 0, "Waiting" };
+	process p3{ "P3",{ 24, 28, 12, 21, 6, 27, 17, 21, 11, 54, 22, 31, 18}, 0, 0, "Waiting" };
+	process	p4{ "P4",{ 15, 35, 14, 41, 16, 45, 18, 51, 14, 61, 13, 54, 16, 61, 15}, 0, 0, "Waiting" };
+	process p5{ "P5",{ 6, 22, 5, 21, 15, 31, 4, 26, 7, 31, 4, 18, 6, 21, 10, 33, 3}, 0, 0, "Waiting" };
+	process p6{ "P6",{ 22, 38, 27, 41, 25, 29, 11, 26, 19, 32, 18, 22, 6, 26, 6}, 0, 0, "Waiting" };
+	process p7{ "P7",{ 4, 36, 7, 31, 6, 32, 5, 41, 4, 42, 7, 39, 6, 33, 5, 34, 6, 21, 9}, 0, 0, "Waiting" };
+	process p8{ "P8",{ 5, 14, 4, 33, 6, 31, 4, 31, 6, 27, 5, 21, 4, 19, 6, 11, 6}, 0, 0, "Waiting" };
 	
 	process initial[] = { p1, p2, p3, p4, p5, p6, p7, p8 };
 	int elements = sizeof(initial) / sizeof(*initial);
-	ReadyQueue.readyQueue(initial, elements);
+	ReadyQueue.initializeQueue(initial, elements);
+	Finished.initializeQueue(initial, elements);
 
 	process now = ReadyQueue.current();
 	process previous = ReadyQueue.current();
@@ -382,12 +422,13 @@ int main() {//Ready Queue is a linked list
 			}
 			else {
 				if (time == endTime) {
-					if (isCompleted(previous) == false) {
-						IOQueue.sendToIO(previous);
+					if (Finished.isCompleted(previous, time) == false) {
+						IOQueue.sendToQueue(previous);
 						j = IOQueue.last().currentCPUBurst;
 						IOQueue.adjustQueue(IOQueue.last().CPUBurstAndIO[j + 1]);
 					}
-					now = ReadyQueue.current();//returns null
+					now = ReadyQueue.current();
+					Finished.setResponseTime(time, now);
 					ReadyQueue.print(now, time);
 					previous = ReadyQueue.current();
 					ReadyQueue.deQueue();
@@ -402,7 +443,7 @@ int main() {//Ready Queue is a linked list
 					if (IOQueue.transfer() == true) {
 						transfer = IOQueue.getFinishIO();
 						IOQueue.deQueueSpecific(transfer);
-						ReadyQueue.sendToIO(transfer);//same as sendToReadyQueue
+						ReadyQueue.sendToQueue(transfer);
 						if (ReadyQueue.hasOne()&& i==0) {
 							if (now.name == "IDLE") {
 								endTime = time;
@@ -419,6 +460,19 @@ int main() {//Ready Queue is a linked list
 			}
 		}
 	}
+
 	cout << "DONE!" << endl << endl;
+
+	double utilization = 0;
+	for (int i=0; i<=elements-1; i++)
+		for (int j = 0; initial[i].CPUBurstAndIO[j] > 0; j=j+2) {
+			utilization = initial[i].CPUBurstAndIO[j] + utilization;
+		}
+
+	utilization = (utilization / (time-1)) * 100;
+	cout << "CPU utilization is: " << utilization << endl;
+	Finished.computeWaitTime(initial);
+	Finished.printFinished();
+
 	return 0;
 }
